@@ -1,0 +1,5 @@
+train_result/
+wandb/
+track_result/
+yolov5/dataset/
+input_video/
