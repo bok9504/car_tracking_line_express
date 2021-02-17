@@ -127,6 +127,9 @@ def detect(opt, save_img=False):
 
     datum_dist = []
 
+    line_fileName = './mapdata/Busan1_IC_Polyline_to_Vertex.txt'
+    all_line = mapdata_load(line_fileName)
+
     percep_frame = 5
     from _collections import deque
     pts = [deque(maxlen=percep_frame+1) for _ in range(10000)]
@@ -166,12 +169,13 @@ def detect(opt, save_img=False):
         # Apply NMS
         pred = non_max_suppression(
             pred, opt.conf_thres, opt.iou_thres, classes=opt.classes, agnostic=opt.agnostic_nms)
-        t2 = time_synchronized()
 
         # Apply Classifier
         if classify:
             pred = apply_classifier(pred, modelc, img, im0s)
             print(pred)
+
+        t2 = time_synchronized()   
 
         # Process detections
         for i, det in enumerate(pred):  # detections per image
@@ -258,7 +262,7 @@ def detect(opt, save_img=False):
 # ------------------------------------------------------------------------------------------------------ img fix start
 
                 match_mid_point_list = matcher_BRISK_BF(im0, GCP_list)
-
+                t3 = time_synchronized()
 # ---------------------------------------------------------------------------------------------------------------------- line start
 
                 # 기준점 위치 갱신을 위한 삼변측량의 거리 정의 및 고정
@@ -270,8 +274,6 @@ def detect(opt, save_img=False):
 
                 line_num = 0
                 pre_P = (0,0)
-                fileName = './mapdata/Busan1_IC_Polyline_to_Vertex.txt'
-                all_line = mapdata_load(fileName)
                 
                 for eachline in all_line:
                     for all_point in range(len(eachline)):
@@ -301,7 +303,8 @@ def detect(opt, save_img=False):
                     im0 = cv2.circle(im0, frm_point[pointNum], 10, (0,0,0),-1)
                     newPoint = intersectionPoint(match_mid_point_list, datum_dist[pointNum])
                     frm_point[pointNum] = newPoint
-# ---------------------------------------------------------------------------------------------------------------------- line end                
+                t4 = time_synchronized()
+#---------------------------------------------------------------------------------------------------------------------- line end                
 
 # ------------------------------------------------------------------------------------------------------ img fix end
 
@@ -469,8 +472,12 @@ def detect(opt, save_img=False):
             # else:
             #     deepsort.increment_ages()
 
-            # Print time (inference + NMS)
-            print('%sDone. (%.3fs)' % (s, t2 - t1))
+            # Print time (inference + NMS + classify)
+            #print('%sDone. (%.3fs)' % (s, t2 - t1))
+            print('inference + NMS + classify (%.3fs)' % (t2 - t1))
+            print('find mid point (%.3fs)' % (t3 - t2))
+            print('draw line (%.3fs)' % (t4 - t3))
+            
 
             # Stream results
             if view_img:

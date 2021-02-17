@@ -9,8 +9,8 @@ locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
 def mapdata_load(fileName):
     txtfile = pd.read_csv(fileName, sep=',', encoding="utf-8")
     txtfile = txtfile[['OBJECTID', 'Layer', 'x', 'y', 'Elevation']]
-    txtfile['x'] = txtfile['x'].apply(lambda x: locale.atof(x))
-    txtfile['y'] = txtfile['y'].apply(lambda x: locale.atof(x))
+    txtfile['x'] = txtfile['x'].apply(lambda xv: locale.atof(xv))
+    txtfile['y'] = txtfile['y'].apply(lambda yv: locale.atof(yv))
     line_1 = txtfile.loc[txtfile['Layer'] == "차선_실선"]
     line_2 = txtfile.loc[txtfile['Layer'] == "도로경계"]
     line_3 = txtfile.loc[txtfile['Layer'] == "차선_겹선(3)"]
