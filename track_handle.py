@@ -25,24 +25,24 @@ import numpy as np
 import yaml
 from collections import Counter
 from CoordinateMatching.featureMatching.featMatch import matcher_BRISK_BF
-from CoordinateMatching.locMatching.trilateration import point_dist, intersectionPoint
+from CoordinateMatching.locMatching.trilateration import point_dist, intersectionPoint, get_trilateration
 from mapdata.utils import mapdata_load, calc_dist, calc_point
 
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 palette = (2 ** 11 - 1, 2 ** 15 - 1, 2 ** 20 - 1)
 
-# Return true if line segments AB and CD intersect
-# def intersect(A,B,C,D):
-# 	return ccw(A,C,D) != ccw(B,C,D) and ccw(A,B,C) != ccw(A,B,D)
+#Return true if line segments AB and CD intersect
+def intersect(A,B,C,D):
+	return ccw(A,C,D) != ccw(B,C,D) and ccw(A,B,C) != ccw(A,B,D)
 
-# def ccw(A,B,C):
-# 	return (C[1]-A[1]) * (B[0]-A[0]) > (B[1]-A[1]) * (C[0]-A[0])
+def ccw(A,B,C):
+	return (C[1]-A[1]) * (B[0]-A[0]) > (B[1]-A[1]) * (C[0]-A[0])
 
 
-# def compress(data, selectors):
-#     # compress('ABCDEF', [1,0,1,0,1,1]) --> A C E F
-#     return (d for d, s in zip(data, selectors) if s)
+def compress(data, selectors):
+    # compress('ABCDEF', [1,0,1,0,1,1]) --> A C E F
+    return (d for d, s in zip(data, selectors) if s)
 
 def bbox_rel(*xyxy):
     """" Calculates the relative bounding box from absolute pixel values. """
@@ -125,7 +125,12 @@ def detect(opt, save_img=False):
     frm_point = data['frm_point']
     geo_point = data['geo_point']
 
+    Counter_1 = [(488,589), (486,859)]
+    Counter_2 = [(3463,795), (3487,1093)]
+    Counter_list = [Counter_1, Counter_2]
+
     datum_dist = []
+    counter_dist = []
 
     line_fileName = './mapdata/Busan1_IC_Polyline_to_Vertex.txt'
     all_line = mapdata_load(line_fileName)
@@ -133,6 +138,10 @@ def detect(opt, save_img=False):
     percep_frame = 5
     from _collections import deque
     pts = [deque(maxlen=percep_frame+1) for _ in range(10000)]
+    ptsSpeed = [deque(maxlen=1) for _ in range(10000)]
+
+    frame_len = calc_dist(frm_point[1], frm_point[4])
+    geo_len = calc_dist(geo_point[1], geo_point[4])
 
     # ----------------- fix val start
     fixcnt = 1
@@ -142,17 +151,18 @@ def detect(opt, save_img=False):
     memory_index = {}
     memory_id = {}
 
-    total_counter = 0 # 나중에 총 카운터를 만들어 넣으면 되겠지?
+    cnt = np.zeros((len(Counter_list),4))
+    # total_counter = 0 # 나중에 총 카운터를 만들어 넣으면 되겠지?
 
-    count_1_total = 0
-    count_1_veh_c0 = 0
-    count_1_veh_c1 = 0
-    count_1_veh_c2 = 0
+    # count_1_total = 0
+    # count_1_veh_c0 = 0
+    # count_1_veh_c1 = 0
+    # count_1_veh_c2 = 0
 
-    count_2_total = 0
-    count_2_veh_c0 = 0
-    count_2_veh_c1 = 0
-    count_2_veh_c2 = 0
+    # count_2_total = 0
+    # count_2_veh_c0 = 0
+    # count_2_veh_c1 = 0
+    # count_2_veh_c2 = 0
     # ----------------- counter val end
 
     for frame_idx, (path, img, im0s, vid_cap) in enumerate(dataset):
@@ -269,8 +279,14 @@ def detect(opt, save_img=False):
                 if frame_idx == 0:
                     for pointNum in range(len(frm_point)):
                         for GCP_num in range(len(match_mid_point_list)):
-                            datum_dist.append(point_dist(match_mid_point_list[GCP_num][0], match_mid_point_list[GCP_num][1], frm_point[pointNum][0], frm_point[pointNum][1]))
+                            datum_dist.append(point_dist(match_mid_point_list[GCP_num], frm_point[pointNum]))
                     datum_dist = np.reshape(datum_dist,(len(frm_point),len(match_mid_point_list)))
+                    for Ct_list in Counter_list:
+                        for Ctpoint_num in range(len(Ct_list)):
+                            for GCP_num in range(len(match_mid_point_list)):
+                                counter_dist.append(point_dist(match_mid_point_list[GCP_num], Ct_list[Ctpoint_num]))
+                    counter_dist = np.reshape(counter_dist,(len(Counter_list),len(Ct_list), len(match_mid_point_list)))
+
 
                 line_num = 0
                 pre_P = (0,0)
@@ -303,156 +319,105 @@ def detect(opt, save_img=False):
                     im0 = cv2.circle(im0, frm_point[pointNum], 10, (0,0,0),-1)
                     newPoint = intersectionPoint(match_mid_point_list, datum_dist[pointNum])
                     frm_point[pointNum] = newPoint
+
                 t4 = time_synchronized()
+
 #---------------------------------------------------------------------------------------------------------------------- line end                
 
 # ------------------------------------------------------------------------------------------------------ img fix end
 
 # ------------------------------------------------------------------------------------------------------ counting num and class start
-                # utilss/find_img_loc.py 에 포인트 찍는 코드 있습니다앙
-                # clicked_points : y , x
-                #  상단부의 수집기(Counter_1)에는 영상의 상단부 좌표를 반영함/하단부의 수집기(Counter_2)는 영상의 하단부 좌표를 반영함으로써 영상의 회전 반영
-
-
-                #img fix에서 넘어온 데이터 사용! : 검지기 위치 변환!
-                # x1 = match_mid_point1[0]
-                # y1 = match_mid_point1[1]
-                # x2 = match_mid_point2[0]
-                # y2 = match_mid_point2[1]
-                # x3 = match_mid_point3[0]
-                # y3 = match_mid_point3[1]
-                # target_x, traget_y = 488, 589
-                # line_counter_1_x1, line_counter_1_y1 = get_trilateration(x1,y1,x2,y2,x3,y3,target_x,traget_y)
-
-                # x1 = match_mid_point1[0]
-                # y1 = match_mid_point1[1]
-                # x2 = match_mid_point2[0]
-                # y2 = match_mid_point2[1]
-                # x3 = match_mid_point3[0]
-                # y3 = match_mid_point3[1]
-                # target_x, traget_y = 486, 859
-                # line_counter_1_x2, line_counter_1_y2 = get_trilateration(x1,y1,x2,y2,x3,y3,target_x,traget_y)
-
-                # x1 = match_mid_point1[0]
-                # y1 = match_mid_point1[1]
-                # x2 = match_mid_point2[0]
-                # y2 = match_mid_point2[1]
-                # x3 = match_mid_point3[0]
-                # y3 = match_mid_point3[1]
-                # target_x, traget_y = 3463, 795
-                # line_counter_2_x1, line_counter_2_y1 = get_trilateration(x1,y1,x2,y2,x3,y3,target_x,traget_y)
-
-                # x1 = match_mid_point1[0]
-                # y1 = match_mid_point1[1]
-                # x2 = match_mid_point2[0]
-                # y2 = match_mid_point2[1]
-                # x3 = match_mid_point3[0]
-                # y3 = match_mid_point3[1]
-                # target_x, traget_y = 3487, 1093
-                # line_counter_2_x2, line_counter_2_y2 = get_trilateration(x1,y1,x2,y2,x3,y3,target_x,traget_y)
-
-                # line_counter_1 = [(line_counter_1_x1, line_counter_1_y1), (line_counter_1_x2, line_counter_1_y2)] # 향후 좌표에 따라 라인이 바뀌어야 함 : './utilss/find_img_loc.py' 에 점 좌표 찾는 코드 있으니깐 그거 이용하렴
-                # line_counter_2 = [(line_counter_2_x1, line_counter_2_y1), (line_counter_2_x2, line_counter_2_y2)] # 향후 좌표에 따라 라인이 바뀌어야 함 : './utilss/find_img_loc.py' 에 점 좌표 찾는 코드 있으니깐 그거 이용하렴
-
+                Counter_newpoint = []
+                for Ct_num in range(len(Counter_list)):
+                    Ct_list = Counter_list[Ct_num]
+                    for Ctpoint_num in range(len(Ct_list)):
+                        Counter_newpoint.append(intersectionPoint(match_mid_point_list, counter_dist[Ct_num][Ctpoint_num]))
+                Counter_newpoint = np.reshape(Counter_newpoint, (len(Counter_list), len(Ct_list), 2))
                 
-                # D_com_hl_lh = point_dist(486, 859, 3463, 795) # 나중에 실제 거리와 비례하여 속도 구할때 이미지상의 거리 (상단 검지기의 하단, 하단 검지기의 상단)
-                # D_hl_lh = 207.686 # 나중에 실제 거리와 비례하여 속도 구할때 실제 거리(m 단위)
+                for CountNum in Counter_newpoint:
+                    im0 = cv2.line(im0, tuple(CountNum[0]), tuple(CountNum[1]), (0,0,0), 5,-1)                
 
-                # # img fix에서 넘어온 데이터 사용 끝!
+                boxes = []
+                indexIDs = []
+                classIDs = []
+                previous_index = memory_index.copy()
+                previous_id = memory_id.copy()
+                memory_index = {}
+                memory_id = {}
+                COLORS = np.random.randint(0, 255, size=(200, 3),dtype="uint8")
+                if save_txt and len(outputs) != 0:
+                    for j, output in enumerate(outputs):
+                        boxes.append([output[0], output[1], output[2], output[3]])
+                        indexIDs.append(int(output[4]))
+                        classIDs.append(int(output[5]))
+                        memory_index[indexIDs[-1]] = boxes[-1] # 인덱스 아이디와 박스를 맞춰줌
+                        memory_id[indexIDs[-1]] = classIDs[-1] # 인덱스 아이디와 클레스 아이디를 맞춰줌
 
-                # boxes = []
-                # indexIDs = []
-                # classIDs = []
-                # previous_index = memory_index.copy()
-                # previous_id = memory_id.copy()
-                # memory_index = {}
-                # memory_id = {}
-                # COLORS = np.random.randint(0, 255, size=(200, 3),dtype="uint8")
-                # if save_txt and len(outputs) != 0:
-                #     for j, output in enumerate(outputs):
-                #         boxes.append([output[0], output[1], output[2], output[3]])
-                #         indexIDs.append(int(output[4]))
-                #         classIDs.append(int(output[5]))
-                #         memory_index[indexIDs[-1]] = boxes[-1] # 인덱스 아이디와 박스를 맞춰줌
-                #         memory_id[indexIDs[-1]] = classIDs[-1] # 인덱스 아이디와 클레스 아이디를 맞춰줌
+                        if len(pts[output[4]]) == 0:
+                            pts[output[4]].append(frame_idx)
+                        center = (int(((output[0]) + (output[2]))/2), int(((output[1]) + (output[3]))/2))
+                        pts[output[4]].append(center)
+                        if len(pts[output[4]]) == percep_frame + 1:
+                            frmMove_len = np.sqrt(pow(pts[output[4]][-1][0] - pts[output[4]][-percep_frame][0], 2) + pow(pts[output[4]][-1][1] - pts[output[4]][-percep_frame][1], 2))
+                            geoMove_Len = geo_len * frmMove_len / frame_len
+                            speed = geoMove_Len * 29.97 * 3.6 / (pts[output[4]][0]-frame_idx)
+                            ptsSpeed[output[4]].append(speed)
+                            pts[output[4]].clear()
 
-                # if len(boxes) > 0:
-                #     i = int(0)
-                #     for box in boxes:
-                #         # 현 위치와 이전 위치를 비교하여 지나갔는지 체크함
-                #         (x, y) = (int(box[0]), int(box[1])) # Output 0 1 
-                #         (w, h) = (int(box[2]), int(box[3])) # Output 2 3 과 같다.
-                #         color = compute_color_for_labels(indexIDs[i])
+                if len(boxes) > 0:
+                    i = int(0)
+                    for box in boxes:
+                        # 현 위치와 이전 위치를 비교하여 지나갔는지 체크함
+                        (x, y) = (int(box[0]), int(box[1])) # Output 0 1 
+                        (w, h) = (int(box[2]), int(box[3])) # Output 2 3 과 같다.
+                        color = compute_color_for_labels(indexIDs[i])
 
-                #         if indexIDs[i] in previous_index:
-                #             previous_box = previous_index[indexIDs[i]]
-                #             # print()
-                #             # print('previous_box : ')
-                #             # print(previous_box)
-                #             (x2, y2) = (int(previous_box[0]), int(previous_box[1]))
-                #             (w2, h2) = (int(previous_box[2]), int(previous_box[3]))
-                #             p0 = (int(x + (w-x)/2), int(y + (h-y)/2)) # 현재 박스
-                #             p1 = (int(x2 + (w2-x2)/2), int(y2 + (h2-y2)/2)) # 이전 박스
-                #             cv2.line(im0, p0, p1, color, 3) # 이전 정보와 비교 : 중앙에 점을 찍어 가면서 (이전 데이터와 검지 데이터의 점)
+                        if indexIDs[i] in previous_index:
+                            previous_box = previous_index[indexIDs[i]]
+                            # print()
+                            # print('previous_box : ')
+                            # print(previous_box)
+                            (x2, y2) = (int(previous_box[0]), int(previous_box[1]))
+                            (w2, h2) = (int(previous_box[2]), int(previous_box[3]))
+                            p0 = (int(x + (w-x)/2), int(y + (h-y)/2)) # 현재 박스
+                            p1 = (int(x2 + (w2-x2)/2), int(y2 + (h2-y2)/2)) # 이전 박스
+                            cv2.line(im0, p0, p1, color, 3) # 이전 정보와 비교 : 중앙에 점을 찍어 가면서 (이전 데이터와 검지 데이터의 점)
+
+                            # 클레스 구분
+                            previous_class_id = previous_id[indexIDs[i]] # 어차피 인덱스 같기 때문에 그냥 넣어줘도 됨 개꿀ㅋ
 
 
-                #             # 클레스 구분
-                #             previous_class_id = previous_id[indexIDs[i]] # 어차피 인덱스 같기 때문에 그냥 넣어줘도 됨 개꿀ㅋ
+                            # Yolov5와 DeepSort를 통하여 만들어진 첫 결과물(내가 맨든 결과물)
+                            # 프레임 수, 인덱스 아이디, 클레스 이름, x좌표, y좌표, w값, h값, 속도값, null, null
+                            # with open(txt_path_raw2, 'a') as f:
+                            #     f.write(('%g ' * 10+ '\n') % (frame_idx, indexIDs[i], previous_class_id,
+                            #                                 p0[0], p0[1], box[2], box[3], -1, -1))  # label format
 
-                #             # --------------------------------------------------------------------------------- 속도 데이터 생성 strat
+                            for cntr in range(len(Counter_newpoint)):
+                                if intersect(p0, p1, Counter_newpoint[cntr][0], Counter_newpoint[cntr][1]): # 실질적으로 체크함
+                                    if previous_class_id == 0 : cnt[cntr][1] += 1
+                                    elif previous_class_id == 1 : cnt[cntr][2] += 1
+                                    elif previous_class_id == 2 : cnt[cntr][3] += 1
+                                    cnt[cntr][0] += 1
 
-                #             d_com = point_dist(p0[0], p0[1], p1[0], p1[1]) # 이전 거리와 현재 거리
-                #             spd_estimate = (((d_com*D_hl_lh)/D_com_hl_lh)/(1/29.97))*3.6  # 내일 2차원 비례를 통하여 속도를 찾는 방법을 찾자!
-                #             cv2.putText(im0, str(int(spd_estimate)), (p0[0]+30, p0[1]+30), cv2.FONT_HERSHEY_PLAIN, 1, [0,0,0], 2)
-
-                #             #  --------------------------------------------------------------------------------- 속도 데이터 생성 end
-
-                #             # Yolov5와 DeepSort를 통하여 만들어진 첫 결과물(내가 맨든 결과물)
-                #             # 프레임 수, 인덱스 아이디, 클레스 이름, x좌표, y좌표, w값, h값, 속도값, null, null
-                #             with open(txt_path_raw2, 'a') as f:
-                #                 f.write(('%g ' * 10+ '\n') % (frame_idx, indexIDs[i], previous_class_id,
-                #                                             p0[0], p0[1], box[2], box[3], spd_estimate, -1, -1))  # label format
-
-                #             # 이 코드를 여러게 하면 카운터 수를 늘릴 수 있겠지?
-                #             if intersect(p0, p1, line_counter_1[0], line_counter_1[1]): # 실질적으로 체크함
-                #                 if previous_class_id == 0 : count_1_veh_c0 += 1
-                #                 elif previous_class_id == 1 : count_1_veh_c1 += 1
-                #                 elif previous_class_id == 2 : count_1_veh_c2 += 1
-                #                 count_1_total += 1
-
-                #             if intersect(p0, p1, line_counter_2[0], line_counter_2[1]): # 실질적으로 체크함
-                #                 if previous_class_id == 0 : count_2_veh_c0 += 1
-                #                 elif previous_class_id == 1 : count_2_veh_c1 += 1
-                #                 elif previous_class_id == 2 : count_2_veh_c2 += 1
-                #                 count_2_total += 1            
-
-                #         i += 1 # 다음 인덱스와 비교하게 만들기 위하여
+                        i += 1 # 다음 인덱스와 비교하게 만들기 위하여
         
-                # # draw line
-                # cv2.line(im0, line_counter_1[0], line_counter_1[1], (0, 0, 0), 5) # 선 보이도록 : 보이기만 함
-                # # draw counter : 카운터 수를 늘리는 만큼 이 코드도 같이 많아져야 겠지?
-                # cv2.putText(im0, 'count_1_total :' +str(count_1_total), (100,110), cv2.FONT_HERSHEY_DUPLEX, 1.0, (0, 0, 0), 2) # 카운팅 되는거 보이게
-                # cv2.putText(im0, 'count_1_veh_c0 :' +str(count_1_veh_c0), (100,140), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 0, 0), 2) # 카운팅 되는거 보이게
-                # cv2.putText(im0, 'count_1_veh_c1 :' +str(count_1_veh_c1), (100,170), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 0, 0), 2) # 카운팅 되는거 보이게
-                # cv2.putText(im0, 'count_1_veh_c2 :' + str(count_1_veh_c2), (100,200), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 0, 0), 2) # 카운팅 되는거 보이게
-
-                # cv2.line(im0, line_counter_2[0], line_counter_2[1], (0, 0, 0), 5) # 선 보이도록 : 보이기만 함
-                # # draw counter : 카운터 수를 늘리는 만큼 이 코드도 같이 많아져야 겠지?
-                # cv2.putText(im0, 'count_2_total :' +str(count_2_total), (600,110), cv2.FONT_HERSHEY_DUPLEX, 1.0, (0, 0, 0), 2) # 카운팅 되는거 보이게
-                # cv2.putText(im0, 'count_2_veh_c0 :' +str(count_2_veh_c0), (600,140), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 0, 0), 2) # 카운팅 되는거 보이게
-                # cv2.putText(im0, 'count_2_veh_c1 :' +str(count_2_veh_c1), (600,170), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 0, 0), 2) # 카운팅 되는거 보이게
-                # cv2.putText(im0, 'count_2_veh_c2 :' + str(count_2_veh_c2), (600,200), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 0, 0), 2) # 카운팅 되는거 보이게
+                
+                # draw counter
+                for cntr in range(len(Counter_newpoint)):
+                    cv2.putText(im0, 'count_{}_total : {}'.format(cntr+1, cnt[cntr][0]), (100+400*cntr, 110), cv2.FONT_HERSHEY_DUPLEX, 1.0, (0, 0, 0), 2) # 카운팅 되는거 보이게
+                    cv2.putText(im0, 'count_{}_{} : {}'.format(cntr+1, names[0], cnt[cntr][1]), (100+400*cntr, 140), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 0, 0), 2) # 카운팅 되는거 보이게
+                    cv2.putText(im0, 'count_{}_{} : {}'.format(cntr+1, names[1], cnt[cntr][2]), (100+400*cntr, 170), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 0, 0), 2) # 카운팅 되는거 보이게
+                    cv2.putText(im0, 'count_{}_{} : {}'.format(cntr+1, names[2], cnt[cntr][3]), (100+400*cntr, 200), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 0, 0), 2) # 카운팅 되는거 보이게
 
 # ---------------------------------------------------------------------------------------------------------------------- counter end
-
-
 
                 # draw boxes for visualization
                 if len(outputs) > 0:
                     bbox_xyxy = outputs[:, :4]
                     identities = outputs[:, 4:5]
                     cls_id = outputs[:,-1]
-                    draw_boxes(im0, bbox_xyxy, cls_id, identities, names)
+                    draw_boxes(im0, bbox_xyxy, cls_id, identities, names, ptsSpeed)
 
 
                 # Write MOT compliant results to file
@@ -471,13 +436,14 @@ def detect(opt, save_img=False):
 
             # else:
             #     deepsort.increment_ages()
-
+            t5 = time_synchronized()
             # Print time (inference + NMS + classify)
             #print('%sDone. (%.3fs)' % (s, t2 - t1))
             print('inference + NMS + classify (%.3fs)' % (t2 - t1))
             print('find mid point (%.3fs)' % (t3 - t2))
             print('draw line (%.3fs)' % (t4 - t3))
-            
+            print('Count & speed (%.3fs)' % (t5 - t4))
+            print('one frame done (%.3fs)' % (t5 - t1))
 
             # Stream results
             if view_img:
