@@ -437,10 +437,10 @@ def detect(opt, save_img=False):
             #print('%sDone. (%.3fs)' % (s, t2 - t1))
 
             # Stream results
-            # if view_img:
-            #     cv2.imshow(p, im0)
-            #     if cv2.waitKey(1) == ord('q'):  # q to quit
-            #         raise StopIteration
+            if view_img:
+                cv2.imshow(p, im0)
+                if cv2.waitKey(1) == ord('q'):  # q to quit
+                    raise StopIteration
 
 
             t11 = time_synchronized()
