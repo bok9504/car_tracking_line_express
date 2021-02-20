@@ -6,11 +6,16 @@ from scipy import stats
 locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
 
 # mapdata load
-def mapdata_load(fileName):
+def mapdata_load(fileName, frm_point, geo_point):
     txtfile = pd.read_csv(fileName, sep=',', encoding="utf-8")
     txtfile = txtfile[['OBJECTID', 'Layer', 'x', 'y', 'Elevation']]
     txtfile['x'] = txtfile['x'].apply(lambda xv: locale.atof(xv))
     txtfile['y'] = txtfile['y'].apply(lambda yv: locale.atof(yv))
+    frm_inside_point = txtfile[['x','y']].apply(lambda x: calc_point(frm_point, geo_point, (x['x'], x['y'])),axis=1)
+    frm_inside_index = frm_inside_point[frm_inside_point.apply(lambda x: True if (x[0]< 3840 + 500)&\
+                                                                (x[1]< 2160) & (x[0] > -500) & (x[1] > -500) else False)].index
+    txtfile = txtfile.iloc[frm_inside_index]
+    txtfile['frmPoint'] = frm_inside_point[frm_inside_index]
     line_1 = txtfile.loc[txtfile['Layer'] == "차선_실선"]
     line_2 = txtfile.loc[txtfile['Layer'] == "도로경계"]
     line_3 = txtfile.loc[txtfile['Layer'] == "차선_겹선(3)"]
