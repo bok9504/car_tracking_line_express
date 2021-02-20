@@ -39,7 +39,6 @@ def intersect(A,B,C,D):
 def ccw(A,B,C):
 	return (C[1]-A[1]) * (B[0]-A[0]) > (B[1]-A[1]) * (C[0]-A[0])
 
-
 def compress(data, selectors):
     # compress('ABCDEF', [1,0,1,0,1,1]) --> A C E F
     return (d for d, s in zip(data, selectors) if s)
@@ -270,9 +269,9 @@ def detect(opt, save_img=False):
                 """
 
 # ------------------------------------------------------------------------------------------------------ img fix start
-
-                match_mid_point_list = matcher_BRISK_BF(im0, GCP_list)
                 t3 = time_synchronized()
+                match_mid_point_list = matcher_BRISK_BF(im0, GCP_list)
+                t4 = time_synchronized()
 # ---------------------------------------------------------------------------------------------------------------------- line start
 
                 # 기준점 위치 갱신을 위한 삼변측량의 거리 정의 및 고정
@@ -286,7 +285,7 @@ def detect(opt, save_img=False):
                             for GCP_num in range(len(match_mid_point_list)):
                                 counter_dist.append(point_dist(match_mid_point_list[GCP_num], Ct_list[Ctpoint_num]))
                     counter_dist = np.reshape(counter_dist,(len(Counter_list),len(Ct_list), len(match_mid_point_list)))
-
+                t5 = time_synchronized()
 
                 line_num = 0
                 pre_P = (0,0)
@@ -320,7 +319,7 @@ def detect(opt, save_img=False):
                     newPoint = intersectionPoint(match_mid_point_list, datum_dist[pointNum])
                     frm_point[pointNum] = newPoint
 
-                t4 = time_synchronized()
+                t6 = time_synchronized()
 
 #---------------------------------------------------------------------------------------------------------------------- line end                
 
@@ -409,7 +408,7 @@ def detect(opt, save_img=False):
                     cv2.putText(im0, 'count_{}_{} : {}'.format(cntr+1, names[0], cnt[cntr][1]), (100+400*cntr, 140), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 0, 0), 2) # 카운팅 되는거 보이게
                     cv2.putText(im0, 'count_{}_{} : {}'.format(cntr+1, names[1], cnt[cntr][2]), (100+400*cntr, 170), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 0, 0), 2) # 카운팅 되는거 보이게
                     cv2.putText(im0, 'count_{}_{} : {}'.format(cntr+1, names[2], cnt[cntr][3]), (100+400*cntr, 200), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 0, 0), 2) # 카운팅 되는거 보이게
-
+                t7 = time_synchronized()
 # ---------------------------------------------------------------------------------------------------------------------- counter end
 
                 # draw boxes for visualization
@@ -419,7 +418,7 @@ def detect(opt, save_img=False):
                     cls_id = outputs[:,-1]
                     draw_boxes(im0, bbox_xyxy, cls_id, identities, names, ptsSpeed)
 
-
+                t8 = time_synchronized()
                 # Write MOT compliant results to file
                 if save_txt and len(outputs) != 0:
                     for j, output in enumerate(outputs): # 한 라인씩 쓰는 구조
@@ -436,21 +435,16 @@ def detect(opt, save_img=False):
 
             # else:
             #     deepsort.increment_ages()
-            t5 = time_synchronized()
+            t9 = time_synchronized()
             # Print time (inference + NMS + classify)
             #print('%sDone. (%.3fs)' % (s, t2 - t1))
-            print('inference + NMS + classify (%.3fs)' % (t2 - t1))
-            print('find mid point (%.3fs)' % (t3 - t2))
-            print('draw line (%.3fs)' % (t4 - t3))
-            print('Count & speed (%.3fs)' % (t5 - t4))
-            print('one frame done (%.3fs)' % (t5 - t1))
 
             # Stream results
             if view_img:
                 cv2.imshow(p, im0)
                 if cv2.waitKey(1) == ord('q'):  # q to quit
                     raise StopIteration
-
+            t10 = time_synchronized()
             # Save results (image with detections)
             # dataset.mode = 'images'
             # save_path = './track_result/output/{}.jpg'.format(i)
@@ -471,7 +465,19 @@ def detect(opt, save_img=False):
                         vid_writer = cv2.VideoWriter(
                             save_path, cv2.VideoWriter_fourcc(*opt.fourcc), fps, (w, h))
                     vid_writer.write(im0)
-                    
+            t11 = time_synchronized()
+
+            print('inference + NMS + classify (%.3fs)' % (t2 - t1))
+            print('Yolo + DeepSORT (%.3fs)' % (t3 - t2))
+            print('find mid point (%.3fs)' % (t4 - t3))
+            print('삼변측량을 위한 기준거리 산정 (%.3fs)' % (t5 - t4))
+            print('draw line (%.3fs)' % (t6 - t5))
+            print('Count & speed (%.3fs)' % (t7 - t6))
+            print('각차량별 그리기 (%.3fs)' % (t8 - t7))
+            print('txt 데이터 저장 (%.3fs)' % (t9 - t8))
+            print('스크린에 표시하기 (%.3fs)' % (t10 - t9))
+            print('비디오파일로 저장하기 (%.3fs)' % (t11 - t10))
+            print('one frame done (%.3fs)' % (t11 - t1))
 
     if save_txt or save_img:
         print('Results saved to %s' % os.getcwd() + os.sep + out)
@@ -492,11 +498,10 @@ if __name__ == '__main__':
     iou_thres = 0.5
     parser = argparse.ArgumentParser()
     # ./CoordinateMatching/pointcapturing.py 에서 만들어놨던 이미지를 경로로 설정해주면 되겠지?
-    GCP_list = ['./CoordinateMatching/matchimg/cap_source/cap_result/point_1_0167_380_1789.jpg',
-                './CoordinateMatching/matchimg/cap_source/cap_result/point_2_0167_3413_1751.jpg',
+    GCP_list = ['./CoordinateMatching/matchimg/cap_source/cap_result/point_2_0167_3413_1751.jpg',
                 './CoordinateMatching/matchimg/cap_source/cap_result/point_3_0167_1393_287.jpg',
-                './CoordinateMatching/matchimg/cap_source/cap_result/point_4.jpg',
-                './CoordinateMatching/matchimg/cap_source/cap_result/point_5.jpg']
+                './CoordinateMatching/matchimg/cap_source/cap_result/point_4.jpg']
+                # 1번 5번 점이 불안함 -> 담에 돌릴때는 두개 빼고 하자
 
     parser.add_argument('--GCP_list', type=str,
                         default=GCP_list, help='GCP_point_path_list')
