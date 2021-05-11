@@ -32,12 +32,13 @@ os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 palette = (2 ** 11 - 1, 2 ** 15 - 1, 2 ** 20 - 1)
 
-#Return true if line segments AB and CD intersect
+# Return true if line segments AB and CD intersect
 def intersect(A,B,C,D):
 	return ccw(A,C,D) != ccw(B,C,D) and ccw(A,B,C) != ccw(A,B,D)
 
 def ccw(A,B,C):
 	return (C[1]-A[1]) * (B[0]-A[0]) > (B[1]-A[1]) * (C[0]-A[0])
+
 
 def compress(data, selectors):
     # compress('ABCDEF', [1,0,1,0,1,1]) --> A C E F
@@ -119,8 +120,8 @@ def detect(opt, save_img=False):
     txt_path_raw2 = str(Path(out)) + '/results_raw2.txt'
 
     # point load
-    with open('./mapdata/point.yaml') as f:
-        data = yaml.load(f.read())    
+    with open('./mapdata/Busan_IC/point.yaml') as f:
+        data = yaml.load(f.read())
     frm_point = data['frm_point']
     geo_point = data['geo_point']
 
@@ -131,13 +132,14 @@ def detect(opt, save_img=False):
     datum_dist = []
     counter_dist = []
 
-    line_fileName = './mapdata/Busan1_IC_Polyline_to_Vertex.txt'
-    all_line = mapdata_load(line_fileName)
+    fileName = './mapdata/Busan_IC/Busan1_IC_Polyline_to_Vertex.txt'
+    all_line = mapdata_load(fileName)
 
     percep_frame = 5
     from _collections import deque
     pts = [deque(maxlen=percep_frame+1) for _ in range(10000)]
     ptsSpeed = [deque(maxlen=1) for _ in range(10000)]
+    ptsTrack = [deque(maxlen=1000) for _ in range(10000)]
 
     frame_len = calc_dist(frm_point[1], frm_point[4])
     geo_len = calc_dist(geo_point[1], geo_point[4])
@@ -151,17 +153,17 @@ def detect(opt, save_img=False):
     memory_id = {}
 
     cnt = np.zeros((len(Counter_list),4))
-    # total_counter = 0 # 나중에 총 카운터를 만들어 넣으면 되겠지?
+    total_counter = 0 # 나중에 총 카운터를 만들어 넣으면 되겠지?
 
-    # count_1_total = 0
-    # count_1_veh_c0 = 0
-    # count_1_veh_c1 = 0
-    # count_1_veh_c2 = 0
+    count_1_total = 0
+    count_1_veh_c0 = 0
+    count_1_veh_c1 = 0
+    count_1_veh_c2 = 0
 
-    # count_2_total = 0
-    # count_2_veh_c0 = 0
-    # count_2_veh_c1 = 0
-    # count_2_veh_c2 = 0
+    count_2_total = 0
+    count_2_veh_c0 = 0
+    count_2_veh_c1 = 0
+    count_2_veh_c2 = 0
     # ----------------- counter val end
 
     for frame_idx, (path, img, im0s, vid_cap) in enumerate(dataset):
@@ -184,7 +186,7 @@ def detect(opt, save_img=False):
             pred = apply_classifier(pred, modelc, img, im0s)
             print(pred)
 
-        t2 = time_synchronized()   
+        t2 = time_synchronized()
 
         # Process detections
         for i, det in enumerate(pred):  # detections per image
@@ -285,43 +287,44 @@ def detect(opt, save_img=False):
                             for GCP_num in range(len(match_mid_point_list)):
                                 counter_dist.append(point_dist(match_mid_point_list[GCP_num], Ct_list[Ctpoint_num]))
                     counter_dist = np.reshape(counter_dist,(len(Counter_list),len(Ct_list), len(match_mid_point_list)))
-                t5 = time_synchronized()
+                # t5 = time_synchronized()
 
-                line_num = 0
-                pre_P = (0,0)
+                # line_num = 0
+                # pre_P = (0,0)
                 
-                for eachline in all_line:
-                    for all_point in range(len(eachline)):
-                        newpoint = (eachline[['x', 'y']].iloc[all_point][0], eachline[['x', 'y']].iloc[all_point][1])
-                        newpoint = calc_point(frm_point, geo_point, newpoint)
-                        if (newpoint[0] < int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH)) + 500)&(newpoint[1] < int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))&(newpoint[0] > 0)&(newpoint[1] > 0):
-                            if line_num == 0:
-                                im0 = cv2.circle(im0, newpoint, 5, (0,0,255),-1)    # 차선_실선
-                                if calc_dist(pre_P, newpoint) < 390:
-                                    im0 = cv2.line(im0, pre_P, newpoint, (0,0,255), 2,-1)
-                            elif line_num == 1:
-                                im0 = cv2.circle(im0, newpoint, 5, (0,255,0),-1)    # 도로 경계
-                                if calc_dist(pre_P, newpoint) < 420:
-                                    im0 = cv2.line(im0, pre_P, newpoint, (0,255,0), 2,-1)
-                            elif line_num == 2:
-                                im0 = cv2.circle(im0, newpoint, 5, (255,0,0),-1)    # 차선_겹선
-                                if calc_dist(pre_P, newpoint) < 350:
-                                    im0 = cv2.line(im0, pre_P, newpoint, (255,0,0), 2,-1)
-                            else:
-                                im0 = cv2.circle(im0, newpoint, 5, (100,100,0),-1)  # 차선_점선
-                                if calc_dist(pre_P, newpoint) < 600:
-                                    im0 = cv2.line(im0, pre_P, newpoint, (100,100,0), 2,-1)
-                        pre_P = newpoint
-                    line_num += 1
+                # for eachline in all_line:
+                #     for all_point in range(len(eachline)):
+                #         newpoint = (eachline[['x', 'y']].iloc[all_point][0], eachline[['x', 'y']].iloc[all_point][1])
+                #         newpoint = calc_point(frm_point, geo_point, newpoint)
+                #         if (newpoint[0] < int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH)) + 500)&(newpoint[1] < int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))&(newpoint[0] > 0)&(newpoint[1] > 0):
+                #             if line_num == 0:
+                #                 im0 = cv2.circle(im0, newpoint, 5, (0,0,255),-1)    # 차선_실선
+                #                 if calc_dist(pre_P, newpoint) < 390:
+                #                     im0 = cv2.line(im0, pre_P, newpoint, (0,0,255), 2,-1)
+                #             elif line_num == 1:
+                #                 im0 = cv2.circle(im0, newpoint, 5, (0,255,0),-1)    # 도로 경계
+                #                 if calc_dist(pre_P, newpoint) < 420:
+                #                     im0 = cv2.line(im0, pre_P, newpoint, (0,255,0), 2,-1)
+                #             elif line_num == 2:
+                #                 im0 = cv2.circle(im0, newpoint, 5, (255,0,0),-1)    # 차선_겹선
+                #                 if calc_dist(pre_P, newpoint) < 350:
+                #                     im0 = cv2.line(im0, pre_P, newpoint, (255,0,0), 2,-1)
+                #             else:
+                #                 im0 = cv2.circle(im0, newpoint, 5, (100,100,0),-1)  # 차선_점선
+                #                 if calc_dist(pre_P, newpoint) < 600:
+                #                     im0 = cv2.line(im0, pre_P, newpoint, (100,100,0), 2,-1)
+                #         pre_P = newpoint
+                #     line_num += 1
                 
-                for pointNum in range(len(frm_point)):
-                    im0 = cv2.circle(im0, frm_point[pointNum], 10, (0,0,0),-1)
-                    newPoint = intersectionPoint(match_mid_point_list, datum_dist[pointNum])
-                    frm_point[pointNum] = newPoint
+                # t6 = time_synchronized()
 
-                t6 = time_synchronized()
+                # for pointNum in range(len(frm_point)):
+                #     im0 = cv2.circle(im0, frm_point[pointNum], 10, (0,0,0),-1)
+                #     newPoint = intersectionPoint(match_mid_point_list, datum_dist[pointNum])
+                #     frm_point[pointNum] = newPoint
 
-#---------------------------------------------------------------------------------------------------------------------- line end                
+                # t7 = time_synchronized()
+# ---------------------------------------------------------------------------------------------------------------------- line end                
 
 # ------------------------------------------------------------------------------------------------------ img fix end
 
@@ -355,13 +358,19 @@ def detect(opt, save_img=False):
                         if len(pts[output[4]]) == 0:
                             pts[output[4]].append(frame_idx)
                         center = (int(((output[0]) + (output[2]))/2), int(((output[1]) + (output[3]))/2))
-                        pts[output[4]].append(center)
-                        if len(pts[output[4]]) == percep_frame + 1:
-                            frmMove_len = np.sqrt(pow(pts[output[4]][-1][0] - pts[output[4]][-percep_frame][0], 2) + pow(pts[output[4]][-1][1] - pts[output[4]][-percep_frame][1], 2))
-                            geoMove_Len = geo_len * frmMove_len / frame_len
-                            speed = geoMove_Len * 29.97 * 3.6 / (pts[output[4]][0]-frame_idx)
-                            ptsSpeed[output[4]].append(speed)
-                            pts[output[4]].clear()
+                        # pts[output[4]].append(center)
+                        # if len(pts[output[4]]) == percep_frame + 1:
+                        #     frmMove_len = np.sqrt(pow(pts[output[4]][-1][0] - pts[output[4]][-percep_frame][0], 2) + pow(pts[output[4]][-1][1] - pts[output[4]][-percep_frame][1], 2))
+                        #     geoMove_Len = geo_len * frmMove_len / frame_len
+                        #     speed = geoMove_Len * vid_cap.get(cv2.CAP_PROP_FPS) * 3.6 / (pts[output[4]][0]-frame_idx)
+                        #     ptsSpeed[output[4]].append(speed)
+                        #     pts[output[4]].clear()
+
+                        ptsTrack[output[4]].append(center)
+                        for j in range(1, len(ptsTrack[output[4]])):
+                            if ptsTrack[output[4]][j-1] is None or ptsTrack[output[4]][j] is None:
+                                continue
+                            cv2.line(im0, (ptsTrack[output[4]][j-1]), (ptsTrack[output[4]][j]), (0,255,255), 5)
 
                 if len(boxes) > 0:
                     i = int(0)
@@ -388,9 +397,9 @@ def detect(opt, save_img=False):
 
                             # Yolov5와 DeepSort를 통하여 만들어진 첫 결과물(내가 맨든 결과물)
                             # 프레임 수, 인덱스 아이디, 클레스 이름, x좌표, y좌표, w값, h값, 속도값, null, null
-                            # with open(txt_path_raw2, 'a') as f:
-                            #     f.write(('%g ' * 10+ '\n') % (frame_idx, indexIDs[i], previous_class_id,
-                            #                                 p0[0], p0[1], box[2], box[3], -1, -1))  # label format
+                            # if len(ptsSpeed[indexIDs[i]]) != 0:
+                            #     with open(txt_path_raw2, 'a') as f:
+                            #         f.write(('%g ' * 8+ '\n') % (frame_idx, indexIDs[i], previous_class_id, p0[0], p0[1], box[2], box[3], int(abs(ptsSpeed[indexIDs[i]][0]))))  # label format
 
                             for cntr in range(len(Counter_newpoint)):
                                 if intersect(p0, p1, Counter_newpoint[cntr][0], Counter_newpoint[cntr][1]): # 실질적으로 체크함
@@ -408,7 +417,7 @@ def detect(opt, save_img=False):
                     cv2.putText(im0, 'count_{}_{} : {}'.format(cntr+1, names[0], cnt[cntr][1]), (100+400*cntr, 140), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 0, 0), 2) # 카운팅 되는거 보이게
                     cv2.putText(im0, 'count_{}_{} : {}'.format(cntr+1, names[1], cnt[cntr][2]), (100+400*cntr, 170), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 0, 0), 2) # 카운팅 되는거 보이게
                     cv2.putText(im0, 'count_{}_{} : {}'.format(cntr+1, names[2], cnt[cntr][3]), (100+400*cntr, 200), cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 0, 0), 2) # 카운팅 되는거 보이게
-                t7 = time_synchronized()
+                t8 = time_synchronized()
 # ---------------------------------------------------------------------------------------------------------------------- counter end
 
                 # draw boxes for visualization
@@ -418,7 +427,7 @@ def detect(opt, save_img=False):
                     cls_id = outputs[:,-1]
                     draw_boxes(im0, bbox_xyxy, cls_id, identities, names, ptsSpeed)
 
-                t8 = time_synchronized()
+                t9 = time_synchronized()
                 # Write MOT compliant results to file
                 if save_txt and len(outputs) != 0:
                     for j, output in enumerate(outputs): # 한 라인씩 쓰는 구조
@@ -435,7 +444,7 @@ def detect(opt, save_img=False):
 
             # else:
             #     deepsort.increment_ages()
-            t9 = time_synchronized()
+            t10 = time_synchronized()
             # Print time (inference + NMS + classify)
             #print('%sDone. (%.3fs)' % (s, t2 - t1))
 
@@ -444,7 +453,9 @@ def detect(opt, save_img=False):
                 cv2.imshow(p, im0)
                 if cv2.waitKey(1) == ord('q'):  # q to quit
                     raise StopIteration
-            t10 = time_synchronized()
+
+
+            t11 = time_synchronized()
             # Save results (image with detections)
             # dataset.mode = 'images'
             # save_path = './track_result/output/{}.jpg'.format(i)
@@ -465,19 +476,21 @@ def detect(opt, save_img=False):
                         vid_writer = cv2.VideoWriter(
                             save_path, cv2.VideoWriter_fourcc(*opt.fourcc), fps, (w, h))
                     vid_writer.write(im0)
-            t11 = time_synchronized()
+            t12 = time_synchronized()
 
             print('inference + NMS + classify (%.3fs)' % (t2 - t1))
             print('Yolo + DeepSORT (%.3fs)' % (t3 - t2))
             print('find mid point (%.3fs)' % (t4 - t3))
-            print('삼변측량을 위한 기준거리 산정 (%.3fs)' % (t5 - t4))
-            print('draw line (%.3fs)' % (t6 - t5))
-            print('Count & speed (%.3fs)' % (t7 - t6))
-            print('각차량별 그리기 (%.3fs)' % (t8 - t7))
-            print('txt 데이터 저장 (%.3fs)' % (t9 - t8))
-            print('스크린에 표시하기 (%.3fs)' % (t10 - t9))
-            print('비디오파일로 저장하기 (%.3fs)' % (t11 - t10))
-            print('one frame done (%.3fs)' % (t11 - t1))
+            # print('삼변측량을 위한 기준거리 산정 (%.3fs)' % (t5 - t4))
+            # print('draw line (%.3fs)' % (t6 - t5)) # 현재는 정밀도로지도에 있는 모든 점들을 대상 계산중 -> 추후 화면에 표시될 점만 계산하는 작업 필요
+            # print('GCP 점 계산 (%.3fs)' % (t7 - t6))
+            # print('Count & speed (%.3fs)' % (t8 - t7))
+            print('각차량별 그리기 (%.3fs)' % (t9 - t8))
+            print('txt 데이터 저장 (%.3fs)' % (t10 - t9))
+            print('스크린에 표시하기 (%.3fs)' % (t11 - t10))
+            print('비디오파일로 저장하기 (%.3fs)' % (t12 - t11))
+            print('one frame done (%.3fs)' % (t12 - t1))
+                    
 
     if save_txt or save_img:
         print('Results saved to %s' % os.getcwd() + os.sep + out)
@@ -492,16 +505,17 @@ if __name__ == '__main__':
     # 이제 트레킹을 시작해볼까
     img_size = 800 # 이미지 사이즈(default : 640) : 이미지의 크기를 조절(resizing)하여 검출하도록 만듦, 크면 클수록 검지율이 좋아지지만 FPS가 낮아짐, 내 모델에서는 800*800 기준으로 훈련했단다..아직은.. 곧 새컴옴 ㅅㄱ
     model_weights = 'train_result/20210208/weights/best.pt' # custom 모델 경로를 맞추는 것은 기본이겠지?
-    test_data_path = 'input_video' # 테스트 비디오 경로를 맞추는 것도 기본이겠지?
+    test_data_path = 'input_video/DJI_0167.MP4' # 테스트 비디오 경로를 맞추는 것도 기본이겠지?
     classes_type = [0, 1, 2] # 내가 할땐 차량을 3가지로 구분하였단다.. Lette is horse...
     conf_thres = 0.4
     iou_thres = 0.5
     parser = argparse.ArgumentParser()
     # ./CoordinateMatching/pointcapturing.py 에서 만들어놨던 이미지를 경로로 설정해주면 되겠지?
-    GCP_list = ['./CoordinateMatching/matchimg/cap_source/cap_result/point_2_0167_3413_1751.jpg',
-                './CoordinateMatching/matchimg/cap_source/cap_result/point_3_0167_1393_287.jpg',
-                './CoordinateMatching/matchimg/cap_source/cap_result/point_4.jpg']
-                # 1번 5번 점이 불안함 -> 담에 돌릴때는 두개 빼고 하자
+    GCP_list = ['./CoordinateMatching/matchimg/cap_source/cap_result/point_1_0167_380_1789.jpg',
+                './CoordinateMatching/matchimg/cap_source/cap_result/point_2_0167_3413_1751.jpg',
+                './CoordinateMatching/matchimg/cap_source/cap_result/point_3_0167_1393_287.jpg']
+                # './CoordinateMatching/matchimg/cap_source/cap_result/point_4.jpg',
+                # './CoordinateMatching/matchimg/cap_source/cap_result/point_5.jpg']
 
     parser.add_argument('--GCP_list', type=str,
                         default=GCP_list, help='GCP_point_path_list')
